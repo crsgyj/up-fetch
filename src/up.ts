@@ -76,97 +76,97 @@ export const up =
       ])
 
       let attempt = 0
-      let request: Request
+      let request: Request | undefined = undefined;
 
       const outcome = {} as DistributiveOmit<RetryContext, 'request'>
-
-      do {
-         // per-try timeout
-         options.signal = withTimeout(fetcherOpts.signal, options.timeout)
-
-         request = await toStreamable(
-            new Request(
-               input.url
-                  ? input // Request
-                  : resolveUrl(
-                       options.baseUrl,
-                       input, // string | URL
-                       defaultOpts.params,
-                       fetcherOpts.params,
-                       options.serializeParams,
-                    ),
-               options,
-            ),
-            options.onRequestStreaming,
-         )
-         options.onRequest?.(request)
-
-         try {
-            outcome.response = await toStreamable(
-               await fetchFn(
-                  request,
-                  // do not override the request body & patch headers again
-                  { ...omit(options, ['body']), headers: request.headers },
-                  ctx,
-               ),
-               options.onResponseStreaming,
-            )
-         } catch (e: any) {
-            outcome.error = e
-         }
-
-         if (
-            !(await options.retry.when({ request, ...outcome })) ||
-            ++attempt >
-               (typeof options.retry.attempts === 'function'
-                  ? await options.retry.attempts({ request })
-                  : options.retry.attempts)
-         )
-            break
-
-         await abortableDelay(
-            typeof options.retry.delay === 'function'
-               ? await options.retry.delay({ attempt, request, ...outcome })
-               : options.retry.delay,
-            options.signal,
-         )
-         options.onRetry?.({ attempt, request, ...outcome })
-         // biome-ignore lint/correctness/noConstantCondition: <explanation>
-      } while (true)
-
-      if (outcome.error) {
-         defaultOpts.onError?.(outcome.error, request)
-         throw outcome.error
-      }
-      const response = outcome.response as Response
-
-      if (!(await options.reject(response))) {
-         let parsed: any
-         try {
-            parsed = await options.parseResponse(response, request)
-         } catch (error: any) {
-            options.onError?.(error, request)
-            throw error
-         }
-         let data: any
-         try {
-            data = options.schema
-               ? await validate(options.schema, parsed)
-               : parsed
-         } catch (error: any) {
-            options.onError?.(error, request)
-            throw error
-         }
-         options.onSuccess?.(data, request)
-         return data
-      }
-      let respError: any
       try {
-         respError = await options.parseRejected(response, request)
+         do {
+            // per-try timeout
+            options.signal = withTimeout(fetcherOpts.signal, options.timeout)
+
+            request = await toStreamable(
+               new Request(
+                  input.url
+                     ? input // Request
+                     : resolveUrl(
+                          options.baseUrl,
+                          input, // string | URL
+                          defaultOpts.params,
+                          fetcherOpts.params,
+                          options.serializeParams,
+                       ),
+                  options,
+               ),
+               options.onRequestStreaming,
+            )
+            options.onRequest?.(request)
+
+            try {
+               outcome.response = await toStreamable(
+                  await fetchFn(
+                     request,
+                     // do not override the request body & patch headers again
+                     { ...omit(options, ['body']), headers: request.headers },
+                     ctx,
+                  ),
+                  options.onResponseStreaming,
+               )
+            } catch (e: any) {
+               outcome.error = e
+            }
+
+            if (
+               !(await options.retry.when({ request, ...outcome })) ||
+               ++attempt >
+                  (typeof options.retry.attempts === 'function'
+                     ? await options.retry.attempts({ request })
+                     : options.retry.attempts)
+            )
+               break
+
+            await abortableDelay(
+               typeof options.retry.delay === 'function'
+                  ? await options.retry.delay({ attempt, request, ...outcome })
+                  : options.retry.delay,
+               options.signal,
+            )
+            options.onRetry?.({ attempt, request, ...outcome })
+            // biome-ignore lint/correctness/noConstantCondition: <explanation>
+         } while (true)
+
+         if (outcome.error) {
+            throw outcome.error
+         }
+         const response = outcome.response as Response
+
+         if (!(await options.reject(response))) {
+            let parsed: any
+            try {
+               parsed = await options.parseResponse(response, request)
+            } catch (error: any) {
+               throw error
+            }
+            let data: any
+            try {
+               data = options.schema
+                  ? await validate(options.schema, parsed)
+                  : parsed
+            } catch (error: any) {
+               throw error
+            }
+            options.onSuccess?.(data, request)
+            return data
+         }
+         let respError: any
+         try {
+            respError = await options.parseRejected(response, request)
+         } catch (error: any) {
+            throw error
+         }
+         throw respError
       } catch (error: any) {
-         options.onError?.(error, request)
-         throw error
+         const cstError = options.parseError?.(error, request)
+         options.onError?.(cstError ?? error, request)
+         throw cstError ?? error
       }
-      options.onError?.(respError, request)
-      throw respError
    }

@@ -139,7 +139,7 @@ export type DefaultOptions<
    /** HTTP method to use for the request */
    method?: Method
    /** Callback executed when the request fails */
-   onError?: (error: Unknown, request: Request) => void
+   onError?: (error: Unknown, request?: Request) => Error | void
    /** Callback executed before the request is made */
    onRequest?: (request: Request) => void
    /** Callback executed each time a chunk of the request stream is sent */
@@ -156,6 +156,8 @@ export type DefaultOptions<
    parseRejected?: ParseRejected
    /** Function to parse the response data */
    parseResponse?: ParseResponse<TDefaultParsedData>
+   /** parseError */
+   parseError?: (error: any, request?: Request) => Error | void
    /** Function to determine if a response should throw an error */
    reject?: (response: Response) => MaybePromise<boolean>
    /** The default retry options. Will be merged with the fetcher options */
@@ -188,7 +190,7 @@ export type FetcherOptions<
    /** HTTP method */
    method?: Method
    /** Callback executed when the request fails */
-   onError?: (error: Unknown, request: Request) => void
+   onError?: (error: Unknown, request?: Request) => Error | void
    /** Callback executed before the request is made */
    onRequest?: (request: Request) => void
    /** Callback executed each time a chunk of the request stream is sent */
@@ -201,6 +203,8 @@ export type FetcherOptions<
    onSuccess?: (data: any, request: Request) => void
    /** URL parameters */
    params?: Params
+   /** parseError */
+   parseError?: (error: any, request?: Request) => Error | void
    /** Function to parse response errors */
    parseRejected?: ParseRejected
    /** Function to parse the response data */
